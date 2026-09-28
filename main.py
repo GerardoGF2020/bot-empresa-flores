@@ -14,7 +14,7 @@ from googleapiclient.discovery import build
 # ⚙️ CONFIGURACIÓN GOOGLE SHEETS
 SPREADSHEET_ID = "1QgVCGkof5R0HUGNY8m0vFem_OZI3doACahx8D7zdc-E"
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-HOJA_DESTINO = "Respuestas de formulario 1"
+HOJA_DESTINO = "Avisos Bot"
 
 def obtener_servicio_sheets():
     creds_json = os.environ.get("GOOGLE_CREDENTIALS")
@@ -27,7 +27,6 @@ def obtener_servicio_sheets():
 
 def obtener_avisos_existentes(servicio):
     try:
-        # Buscamos en las columnas D (Nombre) y E (Detalles) de la pestaña correcta
         rango = f"'{HOJA_DESTINO}'!D:E"
         result = servicio.spreadsheets().values().get(spreadsheetId=SPREADSHEET_ID, range=rango).execute()
         filas = result.get('values', [])
@@ -67,20 +66,17 @@ def extraer_obituarios_completos():
         time.sleep(8) 
 
         print("⏳ Viajando en el tiempo: Scrolleando para cargar días anteriores...")
-        ultimo_alto = driver.execute_script("return document.body.scrollHeight")
-        for _ in range(15):
+        # Aumentamos los intentos y quitamos el corte abrupto si no encuentra el botón
+        for intento in range(25): 
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(3) 
+            time.sleep(4) 
             
-            nuevo_alto = driver.execute_script("return document.body.scrollHeight")
-            if nuevo_alto == ultimo_alto:
-                try:
-                    btn_cargar = driver.find_element(By.XPATH, "//*[contains(translate(text(), 'CARGAR MÁS', 'cargar más'), 'cargar más') or contains(translate(text(), 'VER MÁS', 'ver más'), 'ver más') or contains(translate(text(), 'ANTERIORES', 'anteriores'), 'anteriores')]")
-                    driver.execute_script("arguments[0].click();", btn_cargar)
-                    time.sleep(4)
-                except:
-                    break 
-            ultimo_alto = driver.execute_script("return document.body.scrollHeight")
+            try:
+                btn_cargar = driver.find_element(By.XPATH, "//*[contains(translate(text(), 'CARGAR MÁS', 'cargar más'), 'cargar más') or contains(translate(text(), 'VER MÁS', 'ver más'), 'ver más') or contains(translate(text(), 'ANTERIORES', 'anteriores'), 'anteriores')]")
+                driver.execute_script("arguments[0].click();", btn_cargar)
+                time.sleep(4)
+            except:
+                pass 
 
         botones = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
         print(f"¡Se encontraron {len(botones)} obituarios históricos en pantalla!")
@@ -118,7 +114,6 @@ def extraer_obituarios_completos():
                     if identificador not in avisos_registrados:
                         avisos_registrados.add(identificador)
                         
-                        # Agregamos la "Marca temporal" para que coincida con tu primera columna
                         marca_temporal = (datetime.utcnow() - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
                         
                         datos_nuevos.append([
@@ -140,7 +135,6 @@ def extraer_obituarios_completos():
         if datos_nuevos:
             print(f"\n☁️ Subiendo {len(datos_nuevos)} registros nuevos a la planilla...")
             body = {'values': datos_nuevos}
-            # Le obligamos a escribir SÓLO en la pestaña del formulario
             rango_destino = f"'{HOJA_DESTINO}'!A:E"
             servicio_sheets.spreadsheets().values().append(
                 spreadsheetId=SPREADSHEET_ID,
