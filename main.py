@@ -45,7 +45,7 @@ def obtener_avisos_existentes(servicio):
         return set()
 
 def extraer_obituarios_completos():
-    url = "https://empresaflores.com/obituarios/?_avisos_del_dia=past"
+    url = "https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past"
     fecha_actual = (datetime.utcnow() - timedelta(hours=3)).strftime("%d/%m/%Y")
 
     servicio_sheets = obtener_servicio_sheets()
@@ -65,72 +65,73 @@ def extraer_obituarios_completos():
         driver.get(url)
         time.sleep(8) 
 
-        print("⏳ Viajando en el tiempo: Scrolleando para cargar días anteriores...")
-        # Aumentamos los intentos y quitamos el corte abrupto si no encuentra el botón
-        for intento in range(25): 
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(4) 
+        # Recorremos 15 páginas hacia atrás en el tiempo
+        for pagina in range(1, 16):
+            print(f"\n📄 --- LEYENDO PÁGINA {pagina} ---")
             
-            try:
-                btn_cargar = driver.find_element(By.XPATH, "//*[contains(translate(text(), 'CARGAR MÁS', 'cargar más'), 'cargar más') or contains(translate(text(), 'VER MÁS', 'ver más'), 'ver más') or contains(translate(text(), 'ANTERIORES', 'anteriores'), 'anteriores')]")
-                driver.execute_script("arguments[0].click();", btn_cargar)
-                time.sleep(4)
-            except:
-                pass 
+            botones = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
+            print(f"¡Se encontraron {len(botones)} obituarios en esta página!")
 
-        botones = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
-        print(f"¡Se encontraron {len(botones)} obituarios históricos en pantalla!")
-
-        for i in range(len(botones)):
-            try:
-                botones_act = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
-                if i >= len(botones_act):
-                    break
-                    
-                boton = botones_act[i]
-                
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", boton)
-                time.sleep(1)
-                driver.execute_script("arguments[0].click();", boton)
-                time.sleep(3) 
-
-                btn_cerrar = driver.find_element(By.XPATH, "//*[contains(text(), 'Cerrar') or contains(text(), 'CERRAR')]")
-                modal = btn_cerrar.find_element(By.XPATH, "./ancestor::div[1]") 
-                
-                for _ in range(6): 
-                    if "Inicio del velatorio" in modal.text or "Inhumacion" in modal.text or len(modal.text) > 100:
+            for i in range(len(botones)):
+                try:
+                    botones_act = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
+                    if i >= len(botones_act):
                         break
-                    modal = modal.find_element(By.XPATH, "./parent::*")
-                
-                texto_completo = modal.text
-                lineas = [linea.strip() for linea in texto_completo.split('\n') if linea.strip() and linea.strip() not in ['Cerrar', 'CERRAR', '×']]
-                
-                if lineas:
-                    nombre_fallecido = lineas[0]
-                    detalles = " | ".join(lineas[1:]) 
-                    
-                    identificador = f"{nombre_fallecido} | {detalles}"
-                    
-                    if identificador not in avisos_registrados:
-                        avisos_registrados.add(identificador)
                         
-                        marca_temporal = (datetime.utcnow() - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
-                        
-                        datos_nuevos.append([
-                            marca_temporal,
-                            "Empresa Flores",
-                            fecha_actual,
-                            nombre_fallecido,
-                            detalles
-                        ])
-                        print(f"✅ Nuevo aviso histórico encontrado: {nombre_fallecido}")
+                    boton = botones_act[i]
+                    
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", boton)
+                    time.sleep(1)
+                    driver.execute_script("arguments[0].click();", boton)
+                    time.sleep(2.5) 
 
-                driver.execute_script("arguments[0].click();", btn_cerrar)
-                time.sleep(1.5) 
-                
-            except Exception as e:
-                webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+                    btn_cerrar = driver.find_element(By.XPATH, "//*[contains(text(), 'Cerrar') or contains(text(), 'CERRAR')]")
+                    modal = btn_cerrar.find_element(By.XPATH, "./ancestor::div[1]") 
+                    
+                    for _ in range(6): 
+                        if "Inicio del velatorio" in modal.text or "Inhumacion" in modal.text or len(modal.text) > 100:
+                            break
+                        modal = modal.find_element(By.XPATH, "./parent::*")
+                    
+                    texto_completo = modal.text
+                    lineas = [linea.strip() for linea in texto_completo.split('\n') if linea.strip() and linea.strip() not in ['Cerrar', 'CERRAR', '×']]
+                    
+                    if lineas:
+                        nombre_fallecido = lineas[0]
+                        detalles = " | ".join(lineas[1:]) 
+                        identificador = f"{nombre_fallecido} | {detalles}"
+                        
+                        if identificador not in avisos_registrados:
+                            avisos_registrados.add(identificador)
+                            marca_temporal = (datetime.utcnow() - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S")
+                            datos_nuevos.append([
+                                marca_temporal,
+                                "Empresa Flores",
+                                fecha_actual,
+                                nombre_fallecido,
+                                detalles
+                            ])
+                            print(f"✅ Nuevo aviso: {nombre_fallecido}")
+
+                    driver.execute_script("arguments[0].click();", btn_cerrar)
+                    time.sleep(1.5) 
+                    
+                except Exception as e:
+                    webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+                    time.sleep(1)
+
+            # Pasar a la siguiente página numerada
+            try:
+                # Buscamos el botón 'Siguiente' o la flecha
+                btn_siguiente = driver.find_element(By.XPATH, "//a[contains(@class, 'next') or contains(text(), '»') or contains(text(), '›') or contains(translate(text(), 'SIGUIENTE', 'siguiente'), 'siguiente')]")
+                print("⏩ Viajando a la siguiente página del historial...")
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn_siguiente)
                 time.sleep(1)
+                driver.execute_script("arguments[0].click();", btn_siguiente)
+                time.sleep(6) 
+            except:
+                print("🛑 No hay más páginas disponibles.")
+                break
 
         if datos_nuevos:
             print(f"\n☁️ Subiendo {len(datos_nuevos)} registros nuevos a la planilla...")
