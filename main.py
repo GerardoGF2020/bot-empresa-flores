@@ -12,7 +12,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # ⚙️ CONFIGURACIÓN GOOGLE SHEETS
-SPREADSHEET_ID = "1QgVCGkof5R0HUGNY8mOVfem_OZi3doACahx8D7zdc-E"
+SPREADSHEET_ID = "1QgVCGkof5R0HUGNY8m0vFem_OZI3doACahx8D7zdc-E"
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 def obtener_servicio_sheets():
