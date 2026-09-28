@@ -26,7 +26,6 @@ def obtener_servicio_sheets():
 
 def obtener_avisos_existentes(servicio):
     try:
-        # Leemos las columnas C y D (Nombre y Detalles) 
         result = servicio.spreadsheets().values().get(spreadsheetId=SPREADSHEET_ID, range="C:D").execute()
         filas = result.get('values', [])
         registrados = set()
@@ -64,8 +63,27 @@ def extraer_obituarios_completos():
         driver.get(url)
         time.sleep(8) 
 
+        print("⏳ Viajando en el tiempo: Scrolleando para cargar días anteriores...")
+        # Hacemos que el robot baje por la página para cargar historial (hasta 15 veces)
+        ultimo_alto = driver.execute_script("return document.body.scrollHeight")
+        for _ in range(15):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(3) # Esperamos a que carguen los avisos viejos
+            
+            nuevo_alto = driver.execute_script("return document.body.scrollHeight")
+            if nuevo_alto == ultimo_alto:
+                # Si la página no creció, buscamos si hay un botón de "Cargar más"
+                try:
+                    btn_cargar = driver.find_element(By.XPATH, "//*[contains(translate(text(), 'CARGAR MÁS', 'cargar más'), 'cargar más') or contains(translate(text(), 'VER MÁS', 'ver más'), 'ver más') or contains(translate(text(), 'ANTERIORES', 'anteriores'), 'anteriores')]")
+                    driver.execute_script("arguments[0].click();", btn_cargar)
+                    time.sleep(4)
+                except:
+                    break # Si no hay botón y no baja más, llegamos al final del archivo
+            ultimo_alto = driver.execute_script("return document.body.scrollHeight")
+
+        # Ahora sí, buscamos los botones de información de TODOS los días cargados
         botones = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
-        print(f"¡Se encontraron {len(botones)} obituarios en pantalla!")
+        print(f"¡Se encontraron {len(botones)} obituarios históricos en pantalla!")
 
         for i in range(len(botones)):
             try:
@@ -78,7 +96,6 @@ def extraer_obituarios_completos():
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", boton)
                 time.sleep(1)
                 driver.execute_script("arguments[0].click();", boton)
-                
                 time.sleep(3) 
 
                 btn_cerrar = driver.find_element(By.XPATH, "//*[contains(text(), 'Cerrar') or contains(text(), 'CERRAR')]")
@@ -107,13 +124,12 @@ def extraer_obituarios_completos():
                             nombre_fallecido,
                             detalles
                         ])
-                        print(f"✅ Nuevo aviso encontrado: {nombre_fallecido}")
+                        print(f"✅ Nuevo aviso histórico encontrado: {nombre_fallecido}")
 
                 driver.execute_script("arguments[0].click();", btn_cerrar)
                 time.sleep(1.5) 
                 
             except Exception as e:
-                print(f"⚠️ Error leyendo aviso {i+1}: {e}")
                 webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
                 time.sleep(1)
 
@@ -129,7 +145,7 @@ def extraer_obituarios_completos():
             ).execute()
             print("✅ Planilla actualizada con éxito.")
         else:
-            print("\n⚠️ No hay avisos nuevos para agregar en este momento.")
+            print("\n⚠️ No hay avisos nuevos para agregar.")
 
     except Exception as e:
         print(f"\n❌ Error fatal en la página: {e}")
@@ -138,7 +154,6 @@ def extraer_obituarios_completos():
             driver.quit()
         except:
             pass
-        print("Navegador cerrado.")
 
 if __name__ == "__main__":
     extraer_obituarios_completos()
