@@ -27,29 +27,41 @@ def obtener_servicio_sheets():
 
 def obtener_avisos_existentes(servicio):
     try:
-        rango = f"'{HOJA_DESTINO}'!D:E"
+        # Leemos toda la tabla para contar las filas reales ocupadas
+        rango = f"'{HOJA_DESTINO}'!A:E"
         result = servicio.spreadsheets().values().get(spreadsheetId=SPREADSHEET_ID, range=rango).execute()
         filas = result.get('values', [])
         registrados = set()
         
-        for fila in filas[1:]:
-            if len(fila) >= 2:
-                nombre = fila[0].strip()
-                detalles = fila[1].strip()
-                registrados.add(f"{nombre} | {detalles}")
+        ultima_fila_real = 0
+        
+        for i, fila in enumerate(filas):
+            # Verificamos si la fila tiene algún texto para considerarla ocupada
+            if any(str(celda).strip() for celda in fila):
+                ultima_fila_real = i + 1
                 
-        print(f"📂 Se leyeron {len(registrados)} avisos históricos desde Google Sheets.")
-        return registrados
+            # Guardamos los registros para evitar duplicados (Nombre en col D, Detalles en E)
+            if len(fila) >= 4:
+                nombre = str(fila[3]).strip()
+                detalles = str(fila[4]).strip() if len(fila) >= 5 else ""
+                if nombre:
+                    registrados.add(f"{nombre} | {detalles}")
+                    
+        print(f"📂 Se leyeron {len(registrados)} avisos. Última fila ocupada detectada: {ultima_fila_real}")
+        
+        # Calculamos la próxima fila vacía exacta
+        proxima = ultima_fila_real + 1 if ultima_fila_real > 0 else 1 
+        return registrados, proxima
     except Exception as e:
         print(f"⚠️ No se pudo leer el histórico: {e}")
-        return set()
+        return set(), 1
 
 def extraer_obituarios_completos():
     fecha_actual = (datetime.utcnow() - timedelta(hours=3)).strftime("%d/%m/%Y")
-
     servicio_sheets = obtener_servicio_sheets()
-    avisos_registrados = obtener_avisos_existentes(servicio_sheets)
-    datos_nuevos = []
+    
+    # Obtenemos la próxima fila vacía antes de arrancar
+    avisos_registrados, proxima_fila_vacia = obtener_avisos_existentes(servicio_sheets)
 
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -61,14 +73,13 @@ def extraer_obituarios_completos():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
-        # Navegamos de la página 1 a la 25 para traer el bloque histórico
         for pagina in range(1, 26):
+            datos_nuevos = [] 
             print(f"\n📄 --- LEYENDO PÁGINA {pagina} ---")
             
             if pagina == 1:
                 url_pagina = "https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past"
             else:
-                # Usamos la estructura exacta que descubriste
                 url_pagina = f"https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past&_paged={pagina}"
             
             driver.get(url_pagina)
@@ -130,20 +141,23 @@ def extraer_obituarios_completos():
                     webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
                     time.sleep(1)
 
-        if datos_nuevos:
-            print(f"\n☁️ Subiendo {len(datos_nuevos)} registros nuevos a la planilla...")
-            body = {'values': datos_nuevos}
-            rango_destino = f"'{HOJA_DESTINO}'!A:E"
-            servicio_sheets.spreadsheets().values().append(
-                spreadsheetId=SPREADSHEET_ID,
-                range=rango_destino,
-                valueInputOption="USER_ENTERED",
-                insertDataOption="INSERT_ROWS",
-                body=body
-            ).execute()
-            print("✅ Planilla actualizada con éxito.")
-        else:
-            print("\n⚠️ No hay avisos nuevos para agregar.")
+            # Escribimos usando UPDATE para forzar la posición exacta de las filas
+            if datos_nuevos:
+                print(f"\n☁️ Subiendo {len(datos_nuevos)} registros (a partir de la fila {proxima_fila_vacia})...")
+                body = {'values': datos_nuevos}
+                rango_destino = f"'{HOJA_DESTINO}'!A{proxima_fila_vacia}:E"
+                
+                servicio_sheets.spreadsheets().values().update(
+                    spreadsheetId=SPREADSHEET_ID,
+                    range=rango_destino,
+                    valueInputOption="USER_ENTERED",
+                    body=body
+                ).execute()
+                
+                print(f"✅ Registros guardados. Ajustando puntero de fila...")
+                proxima_fila_vacia += len(datos_nuevos) # Actualizamos la cuenta para la página siguiente
+            else:
+                print(f"\n⚠️ No hay avisos nuevos en la página {pagina} para agregar.")
 
     except Exception as e:
         print(f"\n❌ Error fatal en la página: {e}")
