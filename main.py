@@ -27,7 +27,6 @@ def obtener_servicio_sheets():
 
 def obtener_avisos_existentes(servicio):
     try:
-        # Leemos toda la tabla para contar las filas reales ocupadas
         rango = f"'{HOJA_DESTINO}'!A:E"
         result = servicio.spreadsheets().values().get(spreadsheetId=SPREADSHEET_ID, range=rango).execute()
         filas = result.get('values', [])
@@ -36,11 +35,9 @@ def obtener_avisos_existentes(servicio):
         ultima_fila_real = 0
         
         for i, fila in enumerate(filas):
-            # Verificamos si la fila tiene algún texto para considerarla ocupada
             if any(str(celda).strip() for celda in fila):
                 ultima_fila_real = i + 1
                 
-            # Guardamos los registros para evitar duplicados (Nombre en col D, Detalles en E)
             if len(fila) >= 4:
                 nombre = str(fila[3]).strip()
                 detalles = str(fila[4]).strip() if len(fila) >= 5 else ""
@@ -49,7 +46,6 @@ def obtener_avisos_existentes(servicio):
                     
         print(f"📂 Se leyeron {len(registrados)} avisos. Última fila ocupada detectada: {ultima_fila_real}")
         
-        # Calculamos la próxima fila vacía exacta
         proxima = ultima_fila_real + 1 if ultima_fila_real > 0 else 1 
         return registrados, proxima
     except Exception as e:
@@ -60,7 +56,6 @@ def extraer_obituarios_completos():
     fecha_actual = (datetime.utcnow() - timedelta(hours=3)).strftime("%d/%m/%Y")
     servicio_sheets = obtener_servicio_sheets()
     
-    # Obtenemos la próxima fila vacía antes de arrancar
     avisos_registrados, proxima_fila_vacia = obtener_avisos_existentes(servicio_sheets)
 
     chrome_options = Options()
@@ -73,14 +68,13 @@ def extraer_obituarios_completos():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
-        for pagina in range(1, 26):
+        # Modificamos el rango para que arranque en la 26 y frene en la 50
+        for pagina in range(26, 51):
             datos_nuevos = [] 
             print(f"\n📄 --- LEYENDO PÁGINA {pagina} ---")
             
-            if pagina == 1:
-                url_pagina = "https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past"
-            else:
-                url_pagina = f"https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past&_paged={pagina}"
+            # Usamos directamente la URL con paginación
+            url_pagina = f"https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past&_paged={pagina}"
             
             driver.get(url_pagina)
             time.sleep(8) 
@@ -141,7 +135,6 @@ def extraer_obituarios_completos():
                     webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
                     time.sleep(1)
 
-            # Escribimos usando UPDATE para forzar la posición exacta de las filas
             if datos_nuevos:
                 print(f"\n☁️ Subiendo {len(datos_nuevos)} registros (a partir de la fila {proxima_fila_vacia})...")
                 body = {'values': datos_nuevos}
@@ -155,7 +148,7 @@ def extraer_obituarios_completos():
                 ).execute()
                 
                 print(f"✅ Registros guardados. Ajustando puntero de fila...")
-                proxima_fila_vacia += len(datos_nuevos) # Actualizamos la cuenta para la página siguiente
+                proxima_fila_vacia += len(datos_nuevos)
             else:
                 print(f"\n⚠️ No hay avisos nuevos en la página {pagina} para agregar.")
 
