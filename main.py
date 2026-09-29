@@ -61,17 +61,18 @@ def extraer_obituarios_completos():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
-        # TRUCO INFALIBLE: Navegamos cambiando la URL directamente (Páginas 1 a la 15)
-        for pagina in range(1, 16):
+        # Navegamos de la página 1 a la 25 para traer el bloque histórico
+        for pagina in range(1, 26):
             print(f"\n📄 --- LEYENDO PÁGINA {pagina} ---")
             
             if pagina == 1:
                 url_pagina = "https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past"
             else:
-                url_pagina = f"https://empresaflores.com/obituarios/page/{pagina}/?_empresa=empresa_flores&_avisos_del_dia=past"
+                # Usamos la estructura exacta que descubriste
+                url_pagina = f"https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past&_paged={pagina}"
             
             driver.get(url_pagina)
-            time.sleep(8) # Le damos buen tiempo para cargar
+            time.sleep(8) 
             
             botones = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
             
