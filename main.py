@@ -45,7 +45,6 @@ def obtener_avisos_existentes(servicio):
         return set()
 
 def extraer_obituarios_completos():
-    url = "https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past"
     fecha_actual = (datetime.utcnow() - timedelta(hours=3)).strftime("%d/%m/%Y")
 
     servicio_sheets = obtener_servicio_sheets()
@@ -62,14 +61,24 @@ def extraer_obituarios_completos():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
-        driver.get(url)
-        time.sleep(8) 
-
-        # Recorremos 15 páginas hacia atrás en el tiempo
+        # TRUCO INFALIBLE: Navegamos cambiando la URL directamente (Páginas 1 a la 15)
         for pagina in range(1, 16):
             print(f"\n📄 --- LEYENDO PÁGINA {pagina} ---")
             
+            if pagina == 1:
+                url_pagina = "https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past"
+            else:
+                url_pagina = f"https://empresaflores.com/obituarios/page/{pagina}/?_empresa=empresa_flores&_avisos_del_dia=past"
+            
+            driver.get(url_pagina)
+            time.sleep(8) # Le damos buen tiempo para cargar
+            
             botones = driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'MÁS INFORMACIÓN', 'más información'), 'más información')]")
+            
+            if len(botones) == 0:
+                print("🛑 No se encontraron más avisos en esta página. Terminando búsqueda.")
+                break
+
             print(f"¡Se encontraron {len(botones)} obituarios en esta página!")
 
             for i in range(len(botones)):
@@ -83,7 +92,7 @@ def extraer_obituarios_completos():
                     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", boton)
                     time.sleep(1)
                     driver.execute_script("arguments[0].click();", boton)
-                    time.sleep(2.5) 
+                    time.sleep(3) 
 
                     btn_cerrar = driver.find_element(By.XPATH, "//*[contains(text(), 'Cerrar') or contains(text(), 'CERRAR')]")
                     modal = btn_cerrar.find_element(By.XPATH, "./ancestor::div[1]") 
@@ -119,19 +128,6 @@ def extraer_obituarios_completos():
                 except Exception as e:
                     webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
                     time.sleep(1)
-
-            # Pasar a la siguiente página numerada
-            try:
-                # Buscamos el botón 'Siguiente' o la flecha
-                btn_siguiente = driver.find_element(By.XPATH, "//a[contains(@class, 'next') or contains(text(), '»') or contains(text(), '›') or contains(translate(text(), 'SIGUIENTE', 'siguiente'), 'siguiente')]")
-                print("⏩ Viajando a la siguiente página del historial...")
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn_siguiente)
-                time.sleep(1)
-                driver.execute_script("arguments[0].click();", btn_siguiente)
-                time.sleep(6) 
-            except:
-                print("🛑 No hay más páginas disponibles.")
-                break
 
         if datos_nuevos:
             print(f"\n☁️ Subiendo {len(datos_nuevos)} registros nuevos a la planilla...")
