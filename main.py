@@ -68,12 +68,11 @@ def extraer_obituarios_completos():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
-        # Modificamos el rango para que arranque en la 26 y frene en la 50
-        for pagina in range(26, 51):
+        # Modificamos el rango para que arranque en la 77 y frene en la 101
+        for pagina in range(77, 102):
             datos_nuevos = [] 
             print(f"\n📄 --- LEYENDO PÁGINA {pagina} ---")
             
-            # Usamos directamente la URL con paginación
             url_pagina = f"https://empresaflores.com/obituarios/?_empresa=empresa_flores&_avisos_del_dia=past&_paged={pagina}"
             
             driver.get(url_pagina)
