@@ -68,8 +68,8 @@ def extraer_obituarios_completos():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
-        # Modificamos el rango para que arranque en la 102 y frene en la 126
-        for pagina in range(102, 127):
+        # Modificamos el rango para que arranque en la 127 y frene al terminar la 155
+        for pagina in range(127, 156):
             datos_nuevos = [] 
             print(f"\n📄 --- LEYENDO PÁGINA {pagina} ---")
             
